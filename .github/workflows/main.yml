@@ -24,29 +24,30 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 抓取 Google 官方二進位 SDK (保證成功版)
+    - name: 🌐 抓取 Google 官方 SDK (混合穩定版)
       run: |
         rm -rf ./Frameworks ./temp_admob ./temp_ump
         mkdir -p ./Frameworks
         
-        # 1. 下載官方 AdMob SDK ZIP
+        # 1. 下載 AdMob SDK (使用剛才成功的連結)
         echo "正在下載 AdMob SDK..."
         curl -L https://dl.google.com/googleadmobadssdk/googlemobileadssdkios.zip -o admob.zip
         unzip -q admob.zip -d ./temp_admob
         
-        # 2. 下載官方 UMP SDK ZIP
+        # 2. 下載 UMP SDK (改用 GitHub 克隆，避開失效的 ZIP 連結)
         echo "正在下載 UMP SDK..."
-        curl -L https://dl.google.com/googleadmobadssdk/googleusermessagingplatformsdkios.zip -o ump.zip
-        unzip -q ump.zip -d ./temp_ump
+        git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./temp_ump
         
-        # 3. 搜尋並歸位 (使用更強大的搜尋邏輯)
-        echo "正在搜尋 Frameworks..."
+        # 3. 🌟 全方位搜救：尋找所有 .framework 資料夾
+        echo "正在歸位 Frameworks..."
+        # 搜救 AdMob
         find ./temp_admob -name "GoogleMobileAds.framework" -type d -exec cp -R {} ./Frameworks/ \;
-        find ./temp_ump -name "UserMessagingPlatform.framework" -type d -exec cp -R {} ./Frameworks/ \;
+        # 搜救 UMP (從克隆的目錄中找)
+        find ./temp_ump -name "UserMessagingPlatform.framework" -type d | grep "ios-arm64" | xargs -I {} cp -R {} ./Frameworks/
         
         # 4. 驗證是否成功
         echo "--- ✅ 最終 Frameworks 內容 ---"
-        ls -d ./Frameworks/*.framework || (echo "❌ 依然找不到 SDK！內容清單如下：" && ls -R ./temp_admob && exit 1)
+        ls -d ./Frameworks/*.framework || (echo "❌ 依然找不到 SDK！" && exit 1)
 
     - name: 🚀 開始編譯 Dylib
       run: |
