@@ -24,7 +24,7 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 深度搜索並重組 SDK (全 bundle 拷貝版)
+    - name: 🌐 深度搜索並重組 SDK (UMP 救難版)
       run: |
         # 1. 初始化目錄
         rm -rf ./Frameworks ./include ./temp_admob ./temp_ump
@@ -38,29 +38,35 @@ jobs:
         unzip -q admob.zip -d ./temp_admob
         git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./temp_ump
         
-        # 3. 🌟 精準定位 AdMob 並完整拷貝 Bundle
+        # 3. 🌟 定位 AdMob (已有成功經驗)
         echo "--- 🔍 正在定位 AdMob ---"
         G_FRAMEWORK=$(find ./temp_admob -name "GoogleMobileAds.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
         if [ -n "$G_FRAMEWORK" ]; then
           echo "✅ 找到 AdMob: $G_FRAMEWORK"
-          # 完整複製整個 .framework 到 Frameworks 資料夾
           cp -Rf "$G_FRAMEWORK" ./Frameworks/
-          # 額外複製標頭檔到 include 供 Makefile 的 -I 使用 (確保雙重保險)
           cp -R "$G_FRAMEWORK/Headers"/* ./include/GoogleMobileAds/
         else
           echo "❌ 錯誤：找不到 AdMob 實機版"
           exit 1
         fi
         
-        # 4. 🌟 定位 UMP 並完整拷貝 Bundle
+        # 4. 🌟 廣域定位 UMP (修正版)
         echo "--- 🔍 正在定位 UMP ---"
-        U_FRAMEWORK=$(find ./temp_ump -name "UserMessagingPlatform.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
+        # 嘗試從所有資料夾中找尋 UserMessagingPlatform.framework 且包含 ios-arm64 但排除 simulator
+        U_FRAMEWORK=$(find ./temp_ump -name "UserMessagingPlatform.framework" -type d | grep "ios-arm64" | grep -v "simulator" | head -n 1)
+        
+        # 如果還是找不到，嘗試更寬鬆的搜尋 (不分 slice)
+        if [ -z "$U_FRAMEWORK" ]; then
+          U_FRAMEWORK=$(find ./temp_ump -name "UserMessagingPlatform.framework" -type d | head -n 1)
+        fi
+
         if [ -n "$U_FRAMEWORK" ]; then
           echo "✅ 找到 UMP: $U_FRAMEWORK"
           cp -Rf "$U_FRAMEWORK" ./Frameworks/
           cp -R "$U_FRAMEWORK/Headers"/* ./include/UserMessagingPlatform/
         else
-          echo "❌ 錯誤：找不到 UMP 實機版"
+          echo "❌ 錯誤：找不到 UMP 實機版。目前 temp_ump 目錄結構如下："
+          ls -R ./temp_ump
           exit 1
         fi
         
