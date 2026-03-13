@@ -19,22 +19,25 @@ jobs:
         bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
         echo "THEOS=$THEOS" >> $GITHUB_ENV
 
-    - name: 📦 下載 iOS 14.5 SDK (精簡版)
+    - name: 📦 安裝 iOS 14.5 SDK
       run: |
         mkdir -p $THEOS/sdks
         curl -L https://github.com/theos/sdks/raw/master/iPhoneOS14.5.sdk.tar.xz -o $THEOS/sdks/iPhoneOS14.5.sdk.tar.xz
         tar -xf $THEOS/sdks/iPhoneOS14.5.sdk.tar.xz -C $THEOS/sdks/
         rm $THEOS/sdks/iPhoneOS14.5.sdk.tar.xz
 
-    - name: 🗜️ 解壓縮 Frameworks 並檢查路徑
+    - name: 🗜️ 解壓縮並修正路徑
       run: |
         unzip -o Frameworks.zip -d .
-        echo "--- 目前目錄結構 ---"
-        ls -R
+        # 🌟 自動修正：如果你解壓出來多了一層資料夾，這行會把它移到根目錄
+        if [ -d "Frameworks/Frameworks" ]; then
+          mv Frameworks/Frameworks/* ./Frameworks/
+        fi
+        echo "--- 檢查路徑 (這步很重要) ---"
+        ls -R Frameworks/
 
     - name: 🚀 開始編譯 Dylib
       run: |
-        # 這裡會自動處理 Makefile 設定
         make clean
         make
       env:
