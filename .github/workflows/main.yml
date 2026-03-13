@@ -13,25 +13,29 @@ jobs:
     - name: 📥 下載專案代碼
       uses: actions/checkout@v4
 
-    - name: ⚙️ 安裝 Theos
+    - name: ⚙️ 安裝 Theos (強力版)
       run: |
+        # 先拆掉舊的
+        rm -rf ~/theos
         git clone --recursive https://github.com/theos/theos.git ~/theos
         echo "THEOS=~/theos" >> $GITHUB_ENV
 
-    - name: 📦 安裝 iOS SDK
+    - name: 📦 安裝 iOS SDK (強力版)
       run: |
+        # 🌟 關鍵修正：先刪除目標資料夾，避開 already exists 錯誤
+        rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
     - name: 🌐 抓取 Google 官方 SDK (穩定版路徑)
       run: |
+        rm -rf ./Frameworks ./google_sdk ./ump_sdk
         mkdir -p ./Frameworks
-        # 🌟 改用 GitHub 上的 GoogleAds 儲存庫，這比官網連結更穩定
-        git clone --depth 1 https://github.com/googleads/swift-package-manager-google-mobile-ads.git ./google_sdk
         
-        # 複製 GoogleMobileAds
+        # 抓取 Google Ads
+        git clone --depth 1 https://github.com/googleads/swift-package-manager-google-mobile-ads.git ./google_sdk
         cp -R ./google_sdk/Frameworks/GoogleMobileAds.xcframework/ios-arm64/GoogleMobileAds.framework ./Frameworks/
         
-        # 🌟 抓取 UMP SDK (這是 AdMob 必須的依賴)
+        # 抓取 UMP
         git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./ump_sdk
         cp -R ./ump_sdk/Frameworks/UserMessagingPlatform.xcframework/ios-arm64/UserMessagingPlatform.framework ./Frameworks/
         
