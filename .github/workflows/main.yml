@@ -24,47 +24,45 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 直接從 Podspec 提取下載連結並下載 (正則加強版)
+    - name: 🌐 提取 SDK (Python 核心解析版)
       run: |
         mkdir -p ./Frameworks ./include ./temp_admob ./temp_ump
         
         echo "--- 📋 更新 Pod 倉庫索引 ---"
         pod repo update
         
-        # 1. 🌟 使用正則表達式精準抓取 AdMob ZIP 連結
-        echo "--- 🔍 正在查詢 AdMob 下載連結 ---"
-        # 尋找包含 http 且以 .zip 結尾的字串
-        G_URL=$(pod spec cat Google-Mobile-Ads-SDK | grep -o 'https://[^"]*\.zip' | head -n 1)
-        echo "AdMob URL: $G_URL"
+        # 🌟 使用 Python 精準提取 AdMob 連結
+        echo "--- 🔍 正在查詢 AdMob 連結 ---"
+        G_URL=$(pod spec cat Google-Mobile-Ads-SDK | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('source', {}).get('http', ''))")
         
+        # 如果 Python 抓不到，使用官方固定備案連結
         if [ -z "$G_URL" ]; then
-          echo "❌ 錯誤：無法從 Podspec 提取 AdMob 連結！"
-          exit 1
+          G_URL="https://dl.google.com/googleadmobadssdk/googlemobileadssdkios.zip"
+          echo "⚠️ 自動提取失敗，使用備案連結"
         fi
-        curl -L "$G_URL" -o admob.zip
+        echo "AdMob URL: $G_URL"
+        curl -L -A "Mozilla/5.0" "$G_URL" -o admob.zip
         unzip -q admob.zip -d ./temp_admob
-        
-        # 2. 🌟 使用正則表達式精準抓取 UMP ZIP 連結
-        echo "--- 🔍 正在查詢 UMP 下載連結 ---"
-        U_URL=$(pod spec cat GoogleUserMessagingPlatform | grep -o 'https://[^"]*\.zip' | head -n 1)
-        echo "UMP URL: $U_URL"
+
+        # 🌟 使用 Python 精準提取 UMP 連結
+        echo "--- 🔍 正在查詢 UMP 連結 ---"
+        U_URL=$(pod spec cat GoogleUserMessagingPlatform | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('source', {}).get('http', ''))")
         
         if [ -z "$U_URL" ]; then
-          echo "❌ 錯誤：無法從 Podspec 提取 UMP 連結！"
-          exit 1
+          U_URL="https://dl.google.com/googleadmobadssdk/googleusermessagingplatformsdkios.zip"
+          echo "⚠️ 自動提取失敗，使用備案連結"
         fi
-        curl -L "$U_URL" -o ump.zip
+        echo "UMP URL: $U_URL"
+        curl -L -A "Mozilla/5.0" "$U_URL" -o ump.zip
         unzip -q ump.zip -d ./temp_ump
-        
-        # 3. 🚚 搬移並重組結構
+
+        # 🚚 搬移並重組結構
         echo "--- 🚚 正在重組 Frameworks ---"
-        # 定位並提取 AdMob (排除 simulator)
         G_FRAMEWORK=$(find ./temp_admob -name "GoogleMobileAds.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
         cp -Rf "$G_FRAMEWORK" ./Frameworks/
         mkdir -p ./include/GoogleMobileAds
         cp -R "$G_FRAMEWORK/Headers"/* ./include/GoogleMobileAds/
         
-        # 定位並提取 UMP
         U_FRAMEWORK=$(find ./temp_ump -name "UserMessagingPlatform.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
         cp -Rf "$U_FRAMEWORK" ./Frameworks/
         mkdir -p ./include/UserMessagingPlatform
