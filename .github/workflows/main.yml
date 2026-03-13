@@ -24,30 +24,40 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 直接從 Podspec 提取下載連結並下載 (最強穩健版)
+    - name: 🌐 直接從 Podspec 提取下載連結並下載 (正則加強版)
       run: |
         mkdir -p ./Frameworks ./include ./temp_admob ./temp_ump
         
         echo "--- 📋 更新 Pod 倉庫索引 ---"
         pod repo update
         
-        # 1. 🌟 查詢 Google-Mobile-Ads-SDK 的下載網址
+        # 1. 🌟 使用正則表達式精準抓取 AdMob ZIP 連結
         echo "--- 🔍 正在查詢 AdMob 下載連結 ---"
-        G_URL=$(pod spec cat Google-Mobile-Ads-SDK | grep '"http":' | head -n 1 | cut -d'"' -f4)
+        # 尋找包含 http 且以 .zip 結尾的字串
+        G_URL=$(pod spec cat Google-Mobile-Ads-SDK | grep -o 'https://[^"]*\.zip' | head -n 1)
         echo "AdMob URL: $G_URL"
+        
+        if [ -z "$G_URL" ]; then
+          echo "❌ 錯誤：無法從 Podspec 提取 AdMob 連結！"
+          exit 1
+        fi
         curl -L "$G_URL" -o admob.zip
         unzip -q admob.zip -d ./temp_admob
         
-        # 2. 🌟 查詢 GoogleUserMessagingPlatform 的下載網址
+        # 2. 🌟 使用正則表達式精準抓取 UMP ZIP 連結
         echo "--- 🔍 正在查詢 UMP 下載連結 ---"
-        U_URL=$(pod spec cat GoogleUserMessagingPlatform | grep '"http":' | head -n 1 | cut -d'"' -f4)
+        U_URL=$(pod spec cat GoogleUserMessagingPlatform | grep -o 'https://[^"]*\.zip' | head -n 1)
         echo "UMP URL: $U_URL"
+        
+        if [ -z "$U_URL" ]; then
+          echo "❌ 錯誤：無法從 Podspec 提取 UMP 連結！"
+          exit 1
+        fi
         curl -L "$U_URL" -o ump.zip
         unzip -q ump.zip -d ./temp_ump
         
         # 3. 🚚 搬移並重組結構
         echo "--- 🚚 正在重組 Frameworks ---"
-        
         # 定位並提取 AdMob (排除 simulator)
         G_FRAMEWORK=$(find ./temp_admob -name "GoogleMobileAds.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
         cp -Rf "$G_FRAMEWORK" ./Frameworks/
