@@ -23,33 +23,35 @@ jobs:
       run: |
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
-        ls -d ~/theos/sdks/iPhoneOS14.5.sdk
 
-    - name: 🗜️ 解壓縮 Frameworks
+    - name: 🗜️ 強力解壓縮與目錄重構 (核心修正)
       run: |
-        # 確保清理舊資料夾
-        rm -rf Frameworks
-        unzip -o Frameworks.zip -d .
+        # 1. 建立乾淨的目標資料夾
+        mkdir -p ./Frameworks
         
-        # 🌟 自動修正：確保 GoogleMobileAds.framework 就在 ./Frameworks 之下
-        # 有些壓縮軟體會多包一層資料夾，這段代碼會自動把它抓出來
-        if [ -d "Frameworks/Frameworks" ]; then
-          cp -R Frameworks/Frameworks/* ./Frameworks/
+        # 2. 解壓所有內容到臨時目錄
+        unzip -o Frameworks.zip -d ./temp_sdk
+        
+        # 3. 🌟 深度搜救：尋找所有隱藏在 ios-arm64 裡面的真正 framework 並抓出來
+        find ./temp_sdk -name "*.framework" -type d | grep "ios-arm64" | while read -r line; do
+            echo "找到真正的 SDK: $line"
+            cp -R "$line" ./Frameworks/
+        done
+        
+        # 4. 如果沒找到 ios-arm64 (備用方案)，就抓取所有最上層的 framework
+        if [ ! "$(ls -A ./Frameworks)" ]; then
+            find ./temp_sdk -name "*.framework" -type d -maxdepth 4 -exec cp -R {} ./Frameworks/ \;
         fi
-        
-        echo "--- 📋 目前目錄結構診斷 ---"
-        find ./Frameworks -name "*.framework" -maxdepth 2
+
+        # 5. 診斷最終路徑
+        echo "--- ✅ 最終 Frameworks 目錄結構 ---"
+        ls -R ./Frameworks
+        rm -rf ./temp_sdk
 
     - name: 🚀 開始編譯 Dylib
       run: |
-        # 強制指定環境變數
         export THEOS=~/theos
-        export PATH="$THEOS/bin:$PATH"
-        
-        # 打印 Makefile 內容確保沒傳錯
-        cat Makefile
-        
-        # 執行編譯
+        # 強制執行編譯
         make clean
         make FINALPACKAGE=1
       env:
