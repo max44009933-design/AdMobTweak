@@ -24,45 +24,56 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🗜️ 深度搜尋並修正 Frameworks (精準定位)
+    - name: 🗜️ 深度診斷與路徑強行修正
       run: |
+        # 1. 建立標準目錄
         mkdir -p ./Frameworks
         unzip -o Frameworks.zip -d ./temp_sdk
         
-        echo "--- 🔍 開始深度搜尋 SDK 本體 ---"
-        
-        # 1. 尋找 GoogleMobileAds.h 的位置，並將其所屬的 .framework 搬出來
-        G_PATH=$(find ./temp_sdk -name "GoogleMobileAds.h" | grep "ios-arm64" | head -n 1)
-        if [ -n "$G_PATH" ]; then
-            # 取得 Headers 的上一層，即 .framework 資料夾的路徑
-            G_FRAMEWORK_PATH=$(dirname $(dirname "$G_PATH"))
-            echo "✅ 找到 GoogleMobileAds: $G_FRAMEWORK_PATH"
-            cp -R "$G_FRAMEWORK_PATH" ./Frameworks/GoogleMobileAds.framework
-        fi
+        echo "--- 🔍 步驟 1: 正在全硬碟搜索 GoogleMobileAds.h ---"
+        # 尋找所有 GoogleMobileAds.h 的位置
+        find ./temp_sdk -name "GoogleMobileAds.h" | while read -r header_path; do
+          echo "發現標頭檔路徑: $header_path"
+          # 判斷是否為 iOS 實機版本 (排除 simulator)
+          if [[ "$header_path" == *"ios-arm64"* ]] && [[ "$header_path" != *"simulator"* ]]; then
+            # 向上溯源找到 .framework 資料夾
+            # 通常結構是 GoogleMobileAds.framework/Headers/GoogleMobileAds.h 或 GoogleMobileAds.framework/Versions/A/Headers/...
+            # 我們直接抓取包含 Headers 的那層 .framework
+            framework_path=$(echo "$header_path" | sed 's/\.framework.*/.framework/')
+            echo "🚀 抓取實機版 Framework: $framework_path"
+            cp -R "$framework_path/" "./Frameworks/GoogleMobileAds.framework/"
+          fi
+        done
 
-        # 2. 尋找 UserMessagingPlatform.h 的位置
-        U_PATH=$(find ./temp_sdk -name "UserMessagingPlatform.h" | grep "ios-arm64" | head -n 1)
-        if [ -n "$U_PATH" ]; then
-            U_FRAMEWORK_PATH=$(dirname $(dirname "$U_PATH"))
-            echo "✅ 找到 UserMessagingPlatform: $U_FRAMEWORK_PATH"
-            cp -R "$U_FRAMEWORK_PATH" ./Frameworks/UserMessagingPlatform.framework
-        fi
+        echo "--- 🔍 步驟 2: 正在全硬碟搜索 UserMessagingPlatform.h ---"
+        find ./temp_sdk -name "UserMessagingPlatform.h" | while read -r header_path; do
+          if [[ "$header_path" == *"ios-arm64"* ]] && [[ "$header_path" != *"simulator"* ]]; then
+            framework_path=$(echo "$header_path" | sed 's/\.framework.*/.framework/')
+            echo "🚀 抓取實機版 Framework: $framework_path"
+            cp -R "$framework_path/" "./Frameworks/UserMessagingPlatform.framework/"
+          fi
+        done
 
-        echo "--- 📋 最終目錄結構驗證 ---"
-        ls -R ./Frameworks | grep ".h" | head -n 20
+        echo "--- 📋 步驟 3: 最終路徑診斷 (成功的話下方應出現 Headers 內容) ---"
+        if [ -d "./Frameworks/GoogleMobileAds.framework" ]; then
+          ls -R ./Frameworks/GoogleMobileAds.framework | head -n 20
+        else
+          echo "❌ 嚴重錯誤：搜尋後仍未找到 GoogleMobileAds.framework！"
+          echo "ZIP 內所有檔案清單如下："
+          find ./temp_sdk -maxdepth 5
+        fi
         rm -rf ./temp_sdk
 
     - name: 🚀 開始編譯 Dylib
       run: |
         export THEOS=~/theos
-        # 再次檢查檔案是否存在，防止空白編譯
-        if [ -f "./Frameworks/GoogleMobileAds.framework/Headers/GoogleMobileAds.h" ]; then
+        # 再次確認關鍵檔案是否存在，否則停止編譯
+        if [ -f "./Frameworks/GoogleMobileAds.framework/Headers/GoogleMobileAds.h" ] || [ -f "./Frameworks/GoogleMobileAds.framework/GoogleMobileAds.h" ]; then
             make clean
             make FINALPACKAGE=1
         else
-            echo "❌ 嚴重錯誤：即便搜尋後仍找不到標頭檔！請檢查 Frameworks.zip 內容。"
-            find . -name "GoogleMobileAds.h"
-            exit 1
+          echo "❌ 編譯終止：Framework 結構不完整"
+          exit 1
         fi
       env:
         THEOS: ~/theos
