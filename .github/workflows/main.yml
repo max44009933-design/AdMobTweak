@@ -24,39 +24,32 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🗜️ 暴力拆解並強行重組 SDK
+    - name: 💉 將 AdMob 注入 SDK 核心 (黑科技)
       run: |
-        # 1. 建立標準空殼
-        mkdir -p ./Frameworks/GoogleMobileAds.framework/Headers
-        mkdir -p ./Frameworks/UserMessagingPlatform.framework/Headers
         unzip -o Frameworks.zip -d ./temp_sdk
+        # 定義 SDK 的框架路徑
+        SDK_FRAMEWORKS=~/theos/sdks/iPhoneOS14.5.sdk/System/Library/Frameworks
         
-        echo "--- 🛠️ 正在強行重組 GoogleMobileAds ---"
-        # 尋找內層的二進位檔案並歸位
-        find ./temp_sdk -name "GoogleMobileAds" -type f | grep "ios-arm64" | grep ".framework" | head -n 1 | xargs -I {} cp {} ./Frameworks/GoogleMobileAds.framework/
-        # 尋找所有標頭檔並歸位到 Headers 資料夾
-        find ./temp_sdk -name "*.h" | grep "GoogleMobileAds" | grep "ios-arm64" | xargs -I {} cp {} ./Frameworks/GoogleMobileAds.framework/Headers/
-
-        echo "--- 🛠️ 正在強行重組 UserMessagingPlatform ---"
-        find ./temp_sdk -name "UserMessagingPlatform" -type f | grep "ios-arm64" | grep ".framework" | head -n 1 | xargs -I {} cp {} ./Frameworks/UserMessagingPlatform.framework/
-        find ./temp_sdk -name "*.h" | grep "UserMessagingPlatform" | grep "ios-arm64" | xargs -I {} cp {} ./Frameworks/UserMessagingPlatform.framework/Headers/
-
-        echo "--- 📋 最終重組結果檢查 ---"
-        ls -R ./Frameworks
-        rm -rf ./temp_sdk
+        echo "--- 正在進行 SDK 注入 ---"
+        
+        # 尋找 GoogleMobileAds 並搬移到 SDK
+        G_PATH=$(find ./temp_sdk -name "GoogleMobileAds.h" | grep "ios-arm64" | head -n 1)
+        G_DIR=$(dirname $(dirname "$G_PATH"))
+        cp -R "$G_DIR" "$SDK_FRAMEWORKS/GoogleMobileAds.framework"
+        
+        # 尋找 UserMessagingPlatform 並搬移到 SDK
+        U_PATH=$(find ./temp_sdk -name "UserMessagingPlatform.h" | grep "ios-arm64" | head -n 1)
+        U_DIR=$(dirname $(dirname "$U_PATH"))
+        cp -R "$U_DIR" "$SDK_FRAMEWORKS/UserMessagingPlatform.framework"
+        
+        echo "✅ 注入完成！"
+        ls -d "$SDK_FRAMEWORKS/GoogleMobileAds.framework"
 
     - name: 🚀 開始編譯 Dylib
       run: |
         export THEOS=~/theos
-        # 最終生死檢查：確認重組後的標頭檔路徑是否正確
-        if [ -f "./Frameworks/GoogleMobileAds.framework/Headers/GoogleMobileAds.h" ]; then
-            make clean
-            make FINALPACKAGE=1
-        else
-            echo "❌ 嚴重失敗：暴力重組後依然找不到標頭檔！"
-            echo "請檢查您的 Frameworks.zip 裡面是否真的包含 GoogleMobileAds.h"
-            exit 1
-        fi
+        make clean
+        make FINALPACKAGE=1
       env:
         THEOS: ~/theos
 
