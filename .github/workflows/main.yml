@@ -13,30 +13,32 @@ jobs:
     - name: 📥 下載專案代碼
       uses: actions/checkout@v4
 
-    - name: ⚙️ 手動安裝 Theos (穩定防錯版)
+    - name: ⚙️ 手動安裝 Theos (穩定版)
       run: |
-        # 🌟 直接 Clone 原始碼，不執行 install-theos 腳本，避開 API 錯誤
         git clone --recursive https://github.com/theos/theos.git ~/theos
         echo "THEOS=~/theos" >> $GITHUB_ENV
 
-    - name: 📦 安裝 iOS 14.5 SDK
+    - name: 📦 安裝 iOS SDK (修正版)
       run: |
-        # 直接下載打包好的 SDK 檔案，速度最快且最穩定
-        mkdir -p ~/theos/sdks
-        curl -L https://github.com/theos/sdks/raw/master/iPhoneOS14.5.sdk.tar.xz -o ~/theos/sdks/iPhoneOS14.5.sdk.tar.xz
-        tar -xf ~/theos/sdks/iPhoneOS14.5.sdk.tar.xz -C ~/theos/sdks/
-        rm ~/theos/sdks/iPhoneOS14.5.sdk.tar.xz
+        # 直接 Clone SDK 倉庫，確保檔案完整不損壞
+        git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
+        # 檢查 SDK 是否確實存在
+        ls -d ~/theos/sdks/iPhoneOS14.5.sdk
 
-    - name: 🗜️ 解壓縮 Frameworks SDK
+    - name: 🗜️ 解壓縮 Frameworks 並修正結構
       run: |
         unzip -o Frameworks.zip -d .
-        # 確認解壓後的目錄存在
-        ls -R Frameworks/
+        # 🌟 自動排除「資料夾套資料夾」的問題
+        if [ -d "Frameworks/Frameworks" ]; then
+          mv Frameworks/Frameworks/* ./Frameworks/
+        fi
+        echo "--- 檢查目前目錄結構 ---"
+        ls -R
 
     - name: 🚀 開始編譯 Dylib
       run: |
-        # 強制清理並編譯
         export THEOS=~/theos
+        # 確保編譯器能找到 SDK
         make clean
         make
       env:
