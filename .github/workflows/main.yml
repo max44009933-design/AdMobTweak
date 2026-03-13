@@ -13,7 +13,7 @@ jobs:
     - name: 📥 下載專案代碼
       uses: actions/checkout@v4
 
-    - name: ⚙️ 安裝 Theos (強力清場版)
+    - name: ⚙️ 安裝 Theos
       run: |
         rm -rf ~/theos
         git clone --recursive https://github.com/theos/theos.git ~/theos
@@ -24,68 +24,44 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 📦 使用 CocoaPods 抓取 SDK (極簡工程修正版)
+    - name: 🌐 直接從 Podspec 提取下載連結並下載 (最強穩健版)
       run: |
-        mkdir -p ./Frameworks ./include
+        mkdir -p ./Frameworks ./include ./temp_admob ./temp_ump
         
-        # 1. 🌟 建立一個「真正合法」的極簡 Xcode 工程檔案 (解決 Nanaimo 解析錯誤)
-        mkdir -p Dummy.xcodeproj
-        cat <<EOF > Dummy.xcodeproj/project.pbxproj
-        // !\$*UTF8*\$!
-        {
-        	archiveVersion = 1;
-        	classes = {};
-        	objectVersion = 46;
-        	objects = {
-        		13B07F8E1A680F5B00A75B9A /* Project object */ = {
-        			isa = PBXProject;
-        			buildConfigurationList = 13B07F911A680F5B00A75B9A /* Build configuration list for PBXProject "Dummy" */;
-        			compatibilityVersion = "Xcode 3.2";
-        			mainGroup = 13B07F8F1A680F5B00A75B9A;
-        			targets = (13B07F931A680F5B00A75B9A /* Dummy */);
-        		};
-        		13B07F8F1A680F5B00A75B9A = { isa = PBXGroup; children = (); sourceTree = "<group>"; };
-        		13B07F911A680F5B00A75B9A = { isa = XCConfigurationList; buildConfigurations = (13B07F921A680F5B00A75B9A /* Debug */); defaultConfigurationName = Debug; };
-        		13B07F921A680F5B00A75B9A = { isa = XCBuildConfiguration; buildSettings = { PRODUCT_NAME = Dummy; }; name = Debug; };
-        		13B07F931A680F5B00A75B9A = { isa = PBXNativeTarget; buildConfigurationList = 13B07F961A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Dummy" */; buildPhases = (); buildRules = (); dependencies = (); name = Dummy; productType = "com.apple.product-type.application"; };
-        		13B07F961A680F5B00A75B9A = { isa = XCConfigurationList; buildConfigurations = (13B07F971A680F5B00A75B9A /* Debug */); defaultConfigurationName = Debug; };
-        		13B07F971A680F5B00A75B9A = { isa = XCBuildConfiguration; buildSettings = { PRODUCT_NAME = Dummy; }; name = Debug; };
-        	};
-        	rootObject = 13B07F8E1A680F5B00A75B9A /* Project object */;
-        }
-        EOF
+        echo "--- 📋 更新 Pod 倉庫索引 ---"
+        pod repo update
         
-        # 2. 建立 Podfile
-        echo "platform :ios, '14.0'
-        target 'Dummy' do
-          use_frameworks!
-          pod 'Google-Mobile-Ads-SDK'
-        end" > Podfile
+        # 1. 🌟 查詢 Google-Mobile-Ads-SDK 的下載網址
+        echo "--- 🔍 正在查詢 AdMob 下載連結 ---"
+        G_URL=$(pod spec cat Google-Mobile-Ads-SDK | grep '"http":' | head -n 1 | cut -d'"' -f4)
+        echo "AdMob URL: $G_URL"
+        curl -L "$G_URL" -o admob.zip
+        unzip -q admob.zip -d ./temp_admob
         
-        # 3. 執行安裝
-        pod install --repo-update
+        # 2. 🌟 查詢 GoogleUserMessagingPlatform 的下載網址
+        echo "--- 🔍 正在查詢 UMP 下載連結 ---"
+        U_URL=$(pod spec cat GoogleUserMessagingPlatform | grep '"http":' | head -n 1 | cut -d'"' -f4)
+        echo "UMP URL: $U_URL"
+        curl -L "$U_URL" -o ump.zip
+        unzip -q ump.zip -d ./temp_ump
         
-        echo "--- 🔍 正在從 Pods 提取 Frameworks ---"
+        # 3. 🚚 搬移並重組結構
+        echo "--- 🚚 正在重組 Frameworks ---"
         
-        # 4. 提取 GoogleMobileAds
-        G_PATH=\$(find ./Pods -name "GoogleMobileAds.framework" -type d | grep "ios-arm64" | grep -v "simulator" | head -n 1)
-        if [ -n "\$G_PATH" ]; then
-            echo "✅ 找到 AdMob: \$G_PATH"
-            cp -Rf "\$G_PATH" ./Frameworks/
-            mkdir -p ./include/GoogleMobileAds
-            cp -R "\$G_PATH/Headers"/* ./include/GoogleMobileAds/
-        fi
+        # 定位並提取 AdMob (排除 simulator)
+        G_FRAMEWORK=$(find ./temp_admob -name "GoogleMobileAds.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
+        cp -Rf "$G_FRAMEWORK" ./Frameworks/
+        mkdir -p ./include/GoogleMobileAds
+        cp -R "$G_FRAMEWORK/Headers"/* ./include/GoogleMobileAds/
         
-        # 5. 提取 UserMessagingPlatform
-        U_PATH=\$(find ./Pods -name "UserMessagingPlatform.framework" -type d | grep "ios-arm64" | grep -v "simulator" | head -n 1)
-        if [ -n "\$U_PATH" ]; then
-            echo "✅ 找到 UMP: \$U_PATH"
-            cp -Rf "\$U_PATH" ./Frameworks/
-            mkdir -p ./include/UserMessagingPlatform
-            cp -R "\$U_PATH/Headers"/* ./include/UserMessagingPlatform/
-        fi
+        # 定位並提取 UMP
+        U_FRAMEWORK=$(find ./temp_ump -name "UserMessagingPlatform.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
+        cp -Rf "$U_FRAMEWORK" ./Frameworks/
+        mkdir -p ./include/UserMessagingPlatform
+        cp -R "$U_FRAMEWORK/Headers"/* ./include/UserMessagingPlatform/
         
         echo "--- ✅ 全部結構準備就緒 ---"
+        ls -d ./Frameworks/*.framework
 
     - name: 🚀 開始編譯 Dylib
       run: |
