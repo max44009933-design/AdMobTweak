@@ -13,45 +13,38 @@ jobs:
     - name: 📥 下載專案代碼
       uses: actions/checkout@v4
 
-    - name: ⚙️ 安裝 Theos (強力版)
+    - name: ⚙️ 安裝 Theos
       run: |
         rm -rf ~/theos
         git clone --recursive https://github.com/theos/theos.git ~/theos
         echo "THEOS=~/theos" >> $GITHUB_ENV
 
-    - name: 📦 安裝 iOS SDK (強力版)
+    - name: 📦 安裝 iOS SDK
       run: |
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 抓取 Google 官方 SDK (混合穩定版)
+    - name: 🌐 抓取官方 SDK 並強制重組結構
       run: |
-        rm -rf ./Frameworks ./temp_admob ./temp_ump
+        rm -rf ./Frameworks ./google_sdk ./ump_sdk
         mkdir -p ./Frameworks
         
-        # 1. 下載 AdMob SDK (使用剛才成功的連結)
-        echo "正在下載 AdMob SDK..."
-        curl -L https://dl.google.com/googleadmobadssdk/googlemobileadssdkios.zip -o admob.zip
-        unzip -q admob.zip -d ./temp_admob
+        # 1. 抓取 Google Ads
+        git clone --depth 1 https://github.com/googleads/swift-package-manager-google-mobile-ads.git ./google_sdk
+        # 🌟 精準提取：從 .xcframework 裡面抓出真正的 ios-arm64 版本
+        cp -R ./google_sdk/Frameworks/GoogleMobileAds.xcframework/ios-arm64/GoogleMobileAds.framework ./Frameworks/
         
-        # 2. 下載 UMP SDK (改用 GitHub 克隆，避開失效的 ZIP 連結)
-        echo "正在下載 UMP SDK..."
-        git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./temp_ump
+        # 2. 抓取 UMP
+        git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./ump_sdk
+        cp -R ./ump_sdk/Frameworks/UserMessagingPlatform.xcframework/ios-arm64/UserMessagingPlatform.framework ./Frameworks/
         
-        # 3. 🌟 全方位搜救：尋找所有 .framework 資料夾
-        echo "正在歸位 Frameworks..."
-        # 搜救 AdMob
-        find ./temp_admob -name "GoogleMobileAds.framework" -type d -exec cp -R {} ./Frameworks/ \;
-        # 搜救 UMP (從克隆的目錄中找)
-        find ./temp_ump -name "UserMessagingPlatform.framework" -type d | grep "ios-arm64" | xargs -I {} cp -R {} ./Frameworks/
-        
-        # 4. 驗證是否成功
-        echo "--- ✅ 最終 Frameworks 內容 ---"
-        ls -d ./Frameworks/*.framework || (echo "❌ 依然找不到 SDK！" && exit 1)
+        echo "--- 📋 最終檢查標頭檔是否存在 ---"
+        ls -R ./Frameworks/GoogleMobileAds.framework/Headers/GoogleMobileAds.h || exit 1
 
     - name: 🚀 開始編譯 Dylib
       run: |
         export THEOS=~/theos
+        # 使用目前的目錄路徑作為 Framework 搜尋路徑
         make clean
         make FINALPACKAGE=1
       env:
