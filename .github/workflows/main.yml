@@ -24,24 +24,25 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 抓取官方 SDK (架構修正版)
+    - name: 🌐 抓取官方 SDK (搜救隊模式)
       run: |
         rm -rf ./Frameworks ./admob_temp ./ump_temp
         mkdir -p ./Frameworks
         
-        # 1. 下載並提取 AdMob (官方二進位版)
+        # 1. 下載並提取 AdMob
         curl -L https://dl.google.com/googleadmobadssdk/googlemobileadssdkios.zip -o admob.zip
         unzip -q admob.zip -d ./admob_temp
-        G_SRC=$(find ./admob_temp -name "GoogleMobileAds.framework" -type d | head -n 1)
-        cp -Rf "$G_SRC" ./Frameworks/
         
-        # 2. 抓取 UMP (GitHub 倉庫版)
+        # 2. 下載並提取 UMP
         git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./ump_temp
-        U_SRC=$(find ./ump_temp -name "UserMessagingPlatform.framework" -type d | grep "ios-arm64" | head -n 1)
-        cp -Rf "$U_SRC" ./Frameworks/
         
-        echo "--- ✅ 最終結構檢查 (必須看到 GoogleMobileAds.h) ---"
-        ls -R ./Frameworks/GoogleMobileAds.framework/Headers/GoogleMobileAds.h
+        # 🌟 暴力搜尋：不管藏多深，只要是 ios-arm64 且結尾是 .framework 就抓出來
+        echo "--- 正在進行檔案搜救 ---"
+        find ./admob_temp -path "*/ios-arm64/*.framework" -type d -exec cp -Rf {} ./Frameworks/ \;
+        find ./ump_temp -path "*/ios-arm64/*.framework" -type d -exec cp -Rf {} ./Frameworks/ \;
+        
+        echo "--- ✅ 搜救結果 (必須看到內容) ---"
+        ls -d ./Frameworks/*.framework
 
     - name: 🚀 開始編譯 Dylib
       run: |
