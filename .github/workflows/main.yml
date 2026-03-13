@@ -15,35 +15,28 @@ jobs:
 
     - name: ⚙️ 安裝 Theos
       run: |
-        rm -rf ~/theos
         git clone --recursive https://github.com/theos/theos.git ~/theos
         echo "THEOS=~/theos" >> $GITHUB_ENV
 
     - name: 📦 安裝 iOS SDK
       run: |
-        rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 💉 將 AdMob 注入 SDK 核心 (黑科技)
+    - name: 🌐 抓取 Google 官方 SDK (穩定版路徑)
       run: |
-        unzip -o Frameworks.zip -d ./temp_sdk
-        # 定義 SDK 的框架路徑
-        SDK_FRAMEWORKS=~/theos/sdks/iPhoneOS14.5.sdk/System/Library/Frameworks
+        mkdir -p ./Frameworks
+        # 🌟 改用 GitHub 上的 GoogleAds 儲存庫，這比官網連結更穩定
+        git clone --depth 1 https://github.com/googleads/swift-package-manager-google-mobile-ads.git ./google_sdk
         
-        echo "--- 正在進行 SDK 注入 ---"
+        # 複製 GoogleMobileAds
+        cp -R ./google_sdk/Frameworks/GoogleMobileAds.xcframework/ios-arm64/GoogleMobileAds.framework ./Frameworks/
         
-        # 尋找 GoogleMobileAds 並搬移到 SDK
-        G_PATH=$(find ./temp_sdk -name "GoogleMobileAds.h" | grep "ios-arm64" | head -n 1)
-        G_DIR=$(dirname $(dirname "$G_PATH"))
-        cp -R "$G_DIR" "$SDK_FRAMEWORKS/GoogleMobileAds.framework"
+        # 🌟 抓取 UMP SDK (這是 AdMob 必須的依賴)
+        git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./ump_sdk
+        cp -R ./ump_sdk/Frameworks/UserMessagingPlatform.xcframework/ios-arm64/UserMessagingPlatform.framework ./Frameworks/
         
-        # 尋找 UserMessagingPlatform 並搬移到 SDK
-        U_PATH=$(find ./temp_sdk -name "UserMessagingPlatform.h" | grep "ios-arm64" | head -n 1)
-        U_DIR=$(dirname $(dirname "$U_PATH"))
-        cp -R "$U_DIR" "$SDK_FRAMEWORKS/UserMessagingPlatform.framework"
-        
-        echo "✅ 注入完成！"
-        ls -d "$SDK_FRAMEWORKS/GoogleMobileAds.framework"
+        echo "--- ✅ SDK 準備就緒 ---"
+        ls -d ./Frameworks/*.framework
 
     - name: 🚀 開始編譯 Dylib
       run: |
