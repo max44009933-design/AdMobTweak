@@ -15,29 +15,33 @@ jobs:
 
     - name: ⚙️ 安裝 Theos (強力版)
       run: |
-        # 先拆掉舊的
         rm -rf ~/theos
         git clone --recursive https://github.com/theos/theos.git ~/theos
         echo "THEOS=~/theos" >> $GITHUB_ENV
 
     - name: 📦 安裝 iOS SDK (強力版)
       run: |
-        # 🌟 關鍵修正：先刪除目標資料夾，避開 already exists 錯誤
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 抓取 Google 官方 SDK (穩定版路徑)
+    - name: 🌐 抓取 Google 官方 SDK (全自動搜索路徑)
       run: |
         rm -rf ./Frameworks ./google_sdk ./ump_sdk
         mkdir -p ./Frameworks
         
-        # 抓取 Google Ads
+        # 1. 抓取 Google Ads 並自動尋找 framework
         git clone --depth 1 https://github.com/googleads/swift-package-manager-google-mobile-ads.git ./google_sdk
-        cp -R ./google_sdk/Frameworks/GoogleMobileAds.xcframework/ios-arm64/GoogleMobileAds.framework ./Frameworks/
-        
-        # 抓取 UMP
+        G_FRAMEWORK=$(find ./google_sdk -name "GoogleMobileAds.framework" | grep "ios-arm64" | head -n 1)
+        if [ -z "$G_FRAMEWORK" ]; then G_FRAMEWORK=$(find ./google_sdk -name "GoogleMobileAds.framework" | head -n 1); fi
+        echo "找到 GoogleMobileAds: $G_FRAMEWORK"
+        cp -R "$G_FRAMEWORK" ./Frameworks/
+
+        # 2. 抓取 UMP 並自動尋找 framework
         git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./ump_sdk
-        cp -R ./ump_sdk/Frameworks/UserMessagingPlatform.xcframework/ios-arm64/UserMessagingPlatform.framework ./Frameworks/
+        U_FRAMEWORK=$(find ./ump_sdk -name "UserMessagingPlatform.framework" | grep "ios-arm64" | head -n 1)
+        if [ -z "$U_FRAMEWORK" ]; then U_FRAMEWORK=$(find ./ump_sdk -name "UserMessagingPlatform.framework" | head -n 1); fi
+        echo "找到 UserMessagingPlatform: $U_FRAMEWORK"
+        cp -R "$U_FRAMEWORK" ./Frameworks/
         
         echo "--- ✅ SDK 準備就緒 ---"
         ls -d ./Frameworks/*.framework
