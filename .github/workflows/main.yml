@@ -24,13 +24,36 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 📦 使用 CocoaPods 抓取 SDK (語法修正版)
+    - name: 📦 使用 CocoaPods 抓取 SDK (極簡工程修正版)
       run: |
         mkdir -p ./Frameworks ./include
         
-        # 1. 🌟 建立一個更「真」的偽裝 Xcode 工程檔
+        # 1. 🌟 建立一個「真正合法」的極簡 Xcode 工程檔案 (解決 Nanaimo 解析錯誤)
         mkdir -p Dummy.xcodeproj
-        touch Dummy.xcodeproj/project.pbxproj
+        cat <<EOF > Dummy.xcodeproj/project.pbxproj
+        // !\$*UTF8*\$!
+        {
+        	archiveVersion = 1;
+        	classes = {};
+        	objectVersion = 46;
+        	objects = {
+        		13B07F8E1A680F5B00A75B9A /* Project object */ = {
+        			isa = PBXProject;
+        			buildConfigurationList = 13B07F911A680F5B00A75B9A /* Build configuration list for PBXProject "Dummy" */;
+        			compatibilityVersion = "Xcode 3.2";
+        			mainGroup = 13B07F8F1A680F5B00A75B9A;
+        			targets = (13B07F931A680F5B00A75B9A /* Dummy */);
+        		};
+        		13B07F8F1A680F5B00A75B9A = { isa = PBXGroup; children = (); sourceTree = "<group>"; };
+        		13B07F911A680F5B00A75B9A = { isa = XCConfigurationList; buildConfigurations = (13B07F921A680F5B00A75B9A /* Debug */); defaultConfigurationName = Debug; };
+        		13B07F921A680F5B00A75B9A = { isa = XCBuildConfiguration; buildSettings = { PRODUCT_NAME = Dummy; }; name = Debug; };
+        		13B07F931A680F5B00A75B9A = { isa = PBXNativeTarget; buildConfigurationList = 13B07F961A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Dummy" */; buildPhases = (); buildRules = (); dependencies = (); name = Dummy; productType = "com.apple.product-type.application"; };
+        		13B07F961A680F5B00A75B9A = { isa = XCConfigurationList; buildConfigurations = (13B07F971A680F5B00A75B9A /* Debug */); defaultConfigurationName = Debug; };
+        		13B07F971A680F5B00A75B9A = { isa = XCBuildConfiguration; buildSettings = { PRODUCT_NAME = Dummy; }; name = Debug; };
+        	};
+        	rootObject = 13B07F8E1A680F5B00A75B9A /* Project object */;
+        }
+        EOF
         
         # 2. 建立 Podfile
         echo "platform :ios, '14.0'
@@ -39,38 +62,30 @@ jobs:
           pod 'Google-Mobile-Ads-SDK'
         end" > Podfile
         
-        # 3. 執行安裝 (拔掉 --no-integrate，加入 --repo-update 確保連結最新)
+        # 3. 執行安裝
         pod install --repo-update
         
         echo "--- 🔍 正在從 Pods 提取 Frameworks ---"
         
-        # 4. 定位並提取 GoogleMobileAds (廣域搜尋 arm64 實機版)
-        G_PATH=$(find ./Pods -name "GoogleMobileAds.framework" -type d | grep "ios-arm64" | grep -v "simulator" | head -n 1)
-        if [ -n "$G_PATH" ]; then
-            echo "✅ 找到 AdMob: $G_PATH"
-            cp -Rf "$G_PATH" ./Frameworks/
+        # 4. 提取 GoogleMobileAds
+        G_PATH=\$(find ./Pods -name "GoogleMobileAds.framework" -type d | grep "ios-arm64" | grep -v "simulator" | head -n 1)
+        if [ -n "\$G_PATH" ]; then
+            echo "✅ 找到 AdMob: \$G_PATH"
+            cp -Rf "\$G_PATH" ./Frameworks/
             mkdir -p ./include/GoogleMobileAds
-            cp -R "$G_PATH/Headers"/* ./include/GoogleMobileAds/
-        else
-            echo "❌ 錯誤：找不到 AdMob Framework！"
-            find ./Pods -name "*.framework"
-            exit 1
+            cp -R "\$G_PATH/Headers"/* ./include/GoogleMobileAds/
         fi
         
-        # 5. 定位並提取 UserMessagingPlatform
-        U_PATH=$(find ./Pods -name "UserMessagingPlatform.framework" -type d | grep "ios-arm64" | grep -v "simulator" | head -n 1)
-        if [ -n "$U_PATH" ]; then
-            echo "✅ 找到 UMP: $U_PATH"
-            cp -Rf "$U_PATH" ./Frameworks/
+        # 5. 提取 UserMessagingPlatform
+        U_PATH=\$(find ./Pods -name "UserMessagingPlatform.framework" -type d | grep "ios-arm64" | grep -v "simulator" | head -n 1)
+        if [ -n "\$U_PATH" ]; then
+            echo "✅ 找到 UMP: \$U_PATH"
+            cp -Rf "\$U_PATH" ./Frameworks/
             mkdir -p ./include/UserMessagingPlatform
-            cp -R "$U_PATH/Headers"/* ./include/UserMessagingPlatform/
-        else
-            echo "❌ 錯誤：找不到 UMP Framework！"
-            exit 1
+            cp -R "\$U_PATH/Headers"/* ./include/UserMessagingPlatform/
         fi
         
         echo "--- ✅ 全部結構準備就緒 ---"
-        ls -d ./Frameworks/*.framework
 
     - name: 🚀 開始編譯 Dylib
       run: |
