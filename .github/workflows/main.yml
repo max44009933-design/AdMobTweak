@@ -24,29 +24,26 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 抓取官方 SDK (強力權限修復版)
+    - name: 💉 將 AdMob 注入 SDK (核心修正版)
       run: |
-        # 1. 完全清理舊資料夾，避免 Permission denied
-        rm -rf ./Frameworks ./admob_temp ./ump_temp
+        rm -rf ./admob_temp ./ump_temp
         mkdir -p ./Frameworks
         
-        # 2. 下載 AdMob SDK (使用官網穩定二進位包)
-        echo "--- 📥 下載 AdMob SDK ---"
+        # 1. 下載 AdMob
         curl -L https://dl.google.com/googleadmobadssdk/googlemobileadssdkios.zip -o admob.zip
         unzip -q admob.zip -d ./admob_temp
         
-        # 3. 抓取 UMP SDK (改用 GitHub 克隆，避開失效的 ZIP 連結)
-        echo "--- 📥 抓取 UMP SDK ---"
+        # 2. 抓取 UMP
         git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./ump_temp
         
-        # 4. 🌟 強力歸位：使用 -rf 強制覆蓋
-        echo "--- 🚚 正在搬移 Frameworks ---"
-        find ./admob_temp -name "GoogleMobileAds.framework" -type d -exec cp -Rf {} ./Frameworks/ \;
-        find ./ump_temp -name "UserMessagingPlatform.framework" -type d | grep "ios-arm64" | xargs -I {} cp -Rf {} ./Frameworks/
+        # 3. 🌟 關鍵：將它們搬進 SDK 的系統框架目錄
+        SDK_PATH=~/theos/sdks/iPhoneOS14.5.sdk/System/Library/Frameworks
         
-        # 5. 驗證
-        echo "--- ✅ 最終檢查 ---"
-        ls -d ./Frameworks/*.framework
+        find ./admob_temp -name "GoogleMobileAds.framework" -type d -exec cp -Rf {} "$SDK_PATH/" \;
+        find ./ump_temp -name "UserMessagingPlatform.framework" -type d | grep "ios-arm64" | xargs -I {} cp -Rf {} "$SDK_PATH/"
+        
+        echo "--- ✅ SDK 注入完成 ---"
+        ls -d "$SDK_PATH/GoogleMobileAds.framework"
 
     - name: 🚀 開始編譯 Dylib
       run: |
