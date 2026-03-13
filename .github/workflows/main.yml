@@ -24,7 +24,7 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 深度搜索並重組 SDK (UMP 救難版)
+    - name: 🌐 深度搜索並重組 SDK (官方二進制穩定版)
       run: |
         # 1. 初始化目錄
         rm -rf ./Frameworks ./include ./temp_admob ./temp_ump
@@ -32,15 +32,19 @@ jobs:
         mkdir -p ./include/UserMessagingPlatform
         mkdir -p ./Frameworks
         
-        # 2. 下載 SDK
-        echo "--- 📥 下載 SDK 中 ---"
-        curl -L https://dl.google.com/googleadmobadssdk/googlemobileadssdkios.zip -o admob.zip
+        # 2. 下載 AdMob SDK
+        echo "--- 📥 下載 AdMob SDK ---"
+        curl -L -A "Mozilla/5.0" https://dl.google.com/googleadmobadssdk/googlemobileadssdkios.zip -o admob.zip
         unzip -q admob.zip -d ./temp_admob
-        git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./temp_ump
         
-        # 3. 🌟 定位 AdMob (已有成功經驗)
+        # 3. 下載 UMP SDK (直接下載二進制 ZIP，不再克隆 GitHub)
+        echo "--- 📥 下載 UMP SDK ---"
+        curl -L -A "Mozilla/5.0" https://dl.google.com/googleadmobadssdk/googleusermessagingplatformsdkios.zip -o ump.zip
+        unzip -q ump.zip -d ./temp_ump
+        
+        # 4. 🌟 精準定位 AdMob
         echo "--- 🔍 正在定位 AdMob ---"
-        G_FRAMEWORK=$(find ./temp_admob -name "GoogleMobileAds.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
+        G_FRAMEWORK=$(find ./temp_admob -name "GoogleMobileAds.framework" -type d | grep "ios-arm64" | grep -v "simulator" | head -n 1)
         if [ -n "$G_FRAMEWORK" ]; then
           echo "✅ 找到 AdMob: $G_FRAMEWORK"
           cp -Rf "$G_FRAMEWORK" ./Frameworks/
@@ -50,12 +54,10 @@ jobs:
           exit 1
         fi
         
-        # 4. 🌟 廣域定位 UMP (修正版)
+        # 5. 🌟 精準定位 UMP
         echo "--- 🔍 正在定位 UMP ---"
-        # 嘗試從所有資料夾中找尋 UserMessagingPlatform.framework 且包含 ios-arm64 但排除 simulator
         U_FRAMEWORK=$(find ./temp_ump -name "UserMessagingPlatform.framework" -type d | grep "ios-arm64" | grep -v "simulator" | head -n 1)
-        
-        # 如果還是找不到，嘗試更寬鬆的搜尋 (不分 slice)
+        # 如果 ZIP 結構不同，嘗試抓取任何存在的 framework
         if [ -z "$U_FRAMEWORK" ]; then
           U_FRAMEWORK=$(find ./temp_ump -name "UserMessagingPlatform.framework" -type d | head -n 1)
         fi
@@ -65,13 +67,12 @@ jobs:
           cp -Rf "$U_FRAMEWORK" ./Frameworks/
           cp -R "$U_FRAMEWORK/Headers"/* ./include/UserMessagingPlatform/
         else
-          echo "❌ 錯誤：找不到 UMP 實機版。目前 temp_ump 目錄結構如下："
+          echo "❌ 錯誤：官方 ZIP 內仍找不到 UMP 框架！"
           ls -R ./temp_ump
           exit 1
         fi
         
         echo "--- ✅ 全部結構準備就緒 ---"
-        ls -d ./Frameworks/*.framework
 
     - name: 🚀 開始編譯 Dylib
       run: |
