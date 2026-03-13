@@ -24,47 +24,53 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 完整重組 SDK 標頭檔 (結構保留版)
+    - name: 🌐 安全重組 SDK 標頭檔 (防止路徑崩潰版)
       run: |
-        # 1. 清理並建立標準目錄
+        # 1. 初始化目錄
         rm -rf ./Frameworks ./include ./temp_admob ./temp_ump
         mkdir -p ./include/GoogleMobileAds
         mkdir -p ./include/UserMessagingPlatform
         mkdir -p ./Frameworks
         
-        # 2. 下載 AdMob SDK (官方二進位包)
+        # 2. 下載 AdMob SDK
         echo "--- 📥 下載 AdMob SDK ---"
         curl -L https://dl.google.com/googleadmobadssdk/googlemobileadssdkios.zip -o admob.zip
         unzip -q admob.zip -d ./temp_admob
         
-        # 3. 抓取 UMP SDK (GitHub 倉庫版)
+        # 3. 抓取 UMP SDK
         echo "--- 📥 抓取 UMP SDK ---"
         git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./temp_ump
         
-        # 4. 🌟 關鍵修正：完整複製 Headers 並保留子目錄結構 (解決 Mediation 找不到的問題)
-        echo "--- 🚚 正在重組標頭檔結構 ---"
-        
-        # 定位並複製 GoogleMobileAds 標頭檔
+        # 4. 🌟 安全搬移 GoogleMobileAds 標頭檔
         G_HEADERS=$(find ./temp_admob -name "Headers" -type d | grep "GoogleMobileAds.framework" | head -n 1)
-        cp -R "$G_HEADERS"/* ./include/GoogleMobileAds/
+        if [ -n "$G_HEADERS" ]; then
+          echo "✅ 找到 AdMob Headers: $G_HEADERS"
+          cp -R "$G_HEADERS"/* ./include/GoogleMobileAds/
+        else
+          echo "❌ 錯誤：找不到 AdMob Headers！"
+          ls -R ./temp_admob
+          exit 1
+        fi
         
-        # 定位並複製 UMP 標頭檔
+        # 5. 🌟 安全搬移 UMP 標頭檔
         U_HEADERS=$(find ./temp_ump -name "Headers" -type d | grep "UserMessagingPlatform.framework" | head -n 1)
-        cp -R "$U_HEADERS"/* ./include/UserMessagingPlatform/
+        if [ -n "$U_HEADERS" ]; then
+          echo "✅ 找到 UMP Headers: $U_HEADERS"
+          cp -R "$U_HEADERS"/* ./include/UserMessagingPlatform/
+        else
+          echo "❌ 錯誤：找不到 UMP Headers！"
+          exit 1
+        fi
         
-        # 5. 抓取二進位庫 (用於連結)
-        echo "--- 🚚 正在搬移二進位 Framework ---"
+        # 6. 搬移二進位 Framework
         find ./temp_admob -path "*/ios-arm64/*.framework" -type d -exec cp -Rf {} ./Frameworks/ \;
         find ./temp_ump -path "*/ios-arm64/*.framework" -type d -exec cp -Rf {} ./Frameworks/ \;
         
-        echo "--- ✅ 結構檢查 (必須看到 GoogleMobileAds.h 和子目錄) ---"
-        ls -F ./include/GoogleMobileAds/
-        ls -d ./Frameworks/*.framework
+        echo "--- ✅ 全部結構準備就緒 ---"
 
     - name: 🚀 開始編譯 Dylib
       run: |
         export THEOS=~/theos
-        # 強制執行
         make clean
         make FINALPACKAGE=1
       env:
