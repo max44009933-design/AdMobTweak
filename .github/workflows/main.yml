@@ -15,35 +15,43 @@ jobs:
 
     - name: ⚙️ 手動安裝 Theos
       run: |
-        # 確保路徑乾淨
         rm -rf ~/theos
         git clone --recursive https://github.com/theos/theos.git ~/theos
         echo "THEOS=~/theos" >> $GITHUB_ENV
 
-    - name: 📦 安裝 iOS SDK (暴力修正版)
+    - name: 📦 安裝 iOS SDK
       run: |
-        # 🌟 關鍵修正：先刪除舊的 sdks 資料夾，避免 Git 報錯
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
-        # 確認 SDK 確實存在
         ls -d ~/theos/sdks/iPhoneOS14.5.sdk
 
     - name: 🗜️ 解壓縮 Frameworks
       run: |
+        # 確保清理舊資料夾
+        rm -rf Frameworks
         unzip -o Frameworks.zip -d .
-        # 自動修正資料夾層級
+        
+        # 🌟 自動修正：確保 GoogleMobileAds.framework 就在 ./Frameworks 之下
+        # 有些壓縮軟體會多包一層資料夾，這段代碼會自動把它抓出來
         if [ -d "Frameworks/Frameworks" ]; then
-          mv Frameworks/Frameworks/* ./Frameworks/
+          cp -R Frameworks/Frameworks/* ./Frameworks/
         fi
-        echo "--- 檢查目前目錄結構 ---"
-        ls -R ./Frameworks/
+        
+        echo "--- 📋 目前目錄結構診斷 ---"
+        find ./Frameworks -name "*.framework" -maxdepth 2
 
     - name: 🚀 開始編譯 Dylib
       run: |
+        # 強制指定環境變數
         export THEOS=~/theos
-        # 使用全路徑呼叫 make，確保穩定
+        export PATH="$THEOS/bin:$PATH"
+        
+        # 打印 Makefile 內容確保沒傳錯
+        cat Makefile
+        
+        # 執行編譯
         make clean
-        make
+        make FINALPACKAGE=1
       env:
         THEOS: ~/theos
 
@@ -52,4 +60,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: IPA918_AdMobNative_Dylib
-        path: .theos/obj/debug/arm64/*.dylib
+        path: .theos/obj/arm64/*.dylib
