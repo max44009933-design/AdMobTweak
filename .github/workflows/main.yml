@@ -24,7 +24,7 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 安全重組 SDK 標頭檔 (防止路徑崩潰版)
+    - name: 🌐 深度搜索並重組 SDK (排除模擬器版)
       run: |
         # 1. 初始化目錄
         rm -rf ./Frameworks ./include ./temp_admob ./temp_ump
@@ -32,39 +32,45 @@ jobs:
         mkdir -p ./include/UserMessagingPlatform
         mkdir -p ./Frameworks
         
-        # 2. 下載 AdMob SDK
-        echo "--- 📥 下載 AdMob SDK ---"
+        # 2. 下載 SDK
+        echo "--- 📥 下載 SDK 中 ---"
         curl -L https://dl.google.com/googleadmobadssdk/googlemobileadssdkios.zip -o admob.zip
         unzip -q admob.zip -d ./temp_admob
-        
-        # 3. 抓取 UMP SDK
-        echo "--- 📥 抓取 UMP SDK ---"
         git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./temp_ump
         
-        # 4. 🌟 安全搬移 GoogleMobileAds 標頭檔
-        G_HEADERS=$(find ./temp_admob -name "Headers" -type d | grep "GoogleMobileAds.framework" | head -n 1)
+        # 3. 🌟 精準定位 AdMob (排除 simulator，鎖定 ios-arm64)
+        echo "--- 🔍 正在精準定位 AdMob ---"
+        G_HEADERS=$(find ./temp_admob -name "Headers" -type d | grep "GoogleMobileAds.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
         if [ -n "$G_HEADERS" ]; then
-          echo "✅ 找到 AdMob Headers: $G_HEADERS"
+          echo "✅ 找到實機版 AdMob Headers: $G_HEADERS"
           cp -R "$G_HEADERS"/* ./include/GoogleMobileAds/
+          G_BIN=$(dirname "$G_HEADERS")/GoogleMobileAds
+          cp "$G_BIN" ./Frameworks/GoogleMobileAds.framework/GoogleMobileAds || \
+          find ./temp_admob -name "GoogleMobileAds" -type f | grep "ios-arm64" | grep -v "simulator" | xargs -I {} cp {} ./Frameworks/GoogleMobileAds.framework/
         else
-          echo "❌ 錯誤：找不到 AdMob Headers！"
-          ls -R ./temp_admob
+          echo "❌ 錯誤：找不到 AdMob 實機版標頭檔！"
           exit 1
         fi
         
-        # 5. 🌟 安全搬移 UMP 標頭檔
-        U_HEADERS=$(find ./temp_ump -name "Headers" -type d | grep "UserMessagingPlatform.framework" | head -n 1)
+        # 4. 🌟 廣域搜索 UMP (解決 UMP 找不到的問題)
+        echo "--- 🔍 正在廣域搜索 UMP ---"
+        U_HEADERS=$(find ./temp_ump -name "Headers" -type d | grep "UserMessagingPlatform.framework" | grep "ios-arm64" | head -n 1)
+        # 如果還是找不到，嘗試找任何包含 UMP 標頭檔的目錄
+        if [ -z "$U_HEADERS" ]; then
+           U_HEADERS=$(find ./temp_ump -name "UserMessagingPlatform.h" | head -n 1 | xargs dirname)
+        fi
+        
         if [ -n "$U_HEADERS" ]; then
-          echo "✅ 找到 UMP Headers: $U_HEADERS"
+          echo "✅ 找到 UMP 標頭檔路徑: $U_HEADERS"
           cp -R "$U_HEADERS"/* ./include/UserMessagingPlatform/
+          # 搬移二進位檔
+          mkdir -p ./Frameworks/UserMessagingPlatform.framework
+          find ./temp_ump -name "UserMessagingPlatform" -type f | grep "ios-arm64" | head -n 1 | xargs -I {} cp {} ./Frameworks/UserMessagingPlatform.framework/
         else
-          echo "❌ 錯誤：找不到 UMP Headers！"
+          echo "❌ 錯誤：找不到 UMP SDK 檔案！"
+          ls -R ./temp_ump # 失敗時印出結構供診斷
           exit 1
         fi
-        
-        # 6. 搬移二進位 Framework
-        find ./temp_admob -path "*/ios-arm64/*.framework" -type d -exec cp -Rf {} ./Frameworks/ \;
-        find ./temp_ump -path "*/ios-arm64/*.framework" -type d -exec cp -Rf {} ./Frameworks/ \;
         
         echo "--- ✅ 全部結構準備就緒 ---"
 
