@@ -13,7 +13,7 @@ jobs:
     - name: 📥 下載專案代碼
       uses: actions/checkout@v4
 
-    - name: ⚙️ 手動安裝 Theos
+    - name: ⚙️ 安裝 Theos
       run: |
         rm -rf ~/theos
         git clone --recursive https://github.com/theos/theos.git ~/theos
@@ -24,36 +24,41 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🗜️ 強力解壓縮與目錄重構 (核心修正)
+    - name: 🗜️ 暴力解壓縮與 SDK 重構
       run: |
-        # 1. 建立乾淨的目標資料夾
+        # 1. 準備乾淨的目錄
         mkdir -p ./Frameworks
-        
-        # 2. 解壓所有內容到臨時目錄
         unzip -o Frameworks.zip -d ./temp_sdk
         
-        # 3. 🌟 深度搜救：尋找所有隱藏在 ios-arm64 裡面的真正 framework 並抓出來
-        find ./temp_sdk -name "*.framework" -type d | grep "ios-arm64" | while read -r line; do
-            echo "找到真正的 SDK: $line"
-            cp -R "$line" ./Frameworks/
+        # 2. 🌟 暴力搜救：不論埋多深，找出所有真正的 framework (排除模擬器版本)
+        # 我們尋找包含 Headers 的 framework，並優先挑選路徑中含有 arm64 的版本
+        find ./temp_sdk -name "*.framework" -type d | while read -r f; do
+            if [ -d "$f/Headers" ] && [[ "$f" == *"ios-arm64"* ]] && [[ "$f" != *"simulator"* ]]; then
+                fname=$(basename "$f")
+                echo "🚀 發現關鍵 SDK: $f -> 移至 ./Frameworks/$fname"
+                cp -R "$f" "./Frameworks/$fname"
+            fi
         done
         
-        # 4. 如果沒找到 ios-arm64 (備用方案)，就抓取所有最上層的 framework
+        # 3. 如果上面沒抓到，嘗試抓取所有 framework (最後備案)
         if [ ! "$(ls -A ./Frameworks)" ]; then
-            find ./temp_sdk -name "*.framework" -type d -maxdepth 4 -exec cp -R {} ./Frameworks/ \;
+            find ./temp_sdk -name "*.framework" -type d -maxdepth 5 -exec cp -R {} ./Frameworks/ \;
         fi
 
-        # 5. 診斷最終路徑
-        echo "--- ✅ 最終 Frameworks 目錄結構 ---"
-        ls -R ./Frameworks
-        rm -rf ./temp_sdk
+        echo "--- 📋 最終確認 ./Frameworks 內容 ---"
+        ls -d ./Frameworks/*.framework || echo "❌ 警告：依然沒找到任何 framework！"
 
     - name: 🚀 開始編譯 Dylib
       run: |
         export THEOS=~/theos
-        # 強制執行編譯
-        make clean
-        make FINALPACKAGE=1
+        # 如果 Frameworks 裡面有東西才編譯
+        if [ -d "./Frameworks/GoogleMobileAds.framework" ]; then
+            make clean
+            make FINALPACKAGE=1
+        else
+            echo "❌ 錯誤：找不到 GoogleMobileAds.framework，請檢查你的 Frameworks.zip！"
+            exit 1
+        fi
       env:
         THEOS: ~/theos
 
