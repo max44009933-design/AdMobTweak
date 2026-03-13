@@ -24,37 +24,34 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 強力提取 SDK (固定版本號版)
+    - name: 🌐 強力提取 SDK (全方位整合版)
       run: |
-        mkdir -p ./Frameworks ./include ./temp_admob ./temp_ump
+        # 1. 初始化目錄
+        rm -rf ./Frameworks ./include ./temp_sdk
+        mkdir -p ./Frameworks ./include
         
-        # 🌟 1. 下載 AdMob SDK (使用 11.2.0 固定版本)
-        echo "--- 📥 下載 AdMob SDK ---"
-        curl -f -L -A "Mozilla/5.0" "https://dl.google.com/googleadmobadssdk/googlemobileadssdkios-11.2.0.zip" -o admob.zip
-        unzip -q admob.zip -d ./temp_admob
+        # 2. 下載最新 Google Mobile Ads SDK 全能包 (內含 UMP)
+        echo "--- 📥 下載 Google Mobile Ads SDK (v13.x+) ---"
+        curl -f -L -A "Mozilla/5.0" "https://dl.google.com/googleadmobadssdk/googlemobileadssdkios.zip" -o sdk.zip
+        
+        # 安全檢查：確保檔案不是空的路徑
+        if [ $(wc -c < "sdk.zip") -lt 1000000 ]; then echo "❌ 下載檔案過小，連結可能失效"; exit 1; fi
+        unzip -q sdk.zip -d ./temp_sdk
 
-        # 🌟 2. 下載 UMP SDK (使用 2.4.0 固定版本，解決 404 問題)
-        echo "--- 📥 下載 UMP SDK ---"
-        curl -f -L -A "Mozilla/5.0" "https://dl.google.com/googleadmobadssdk/googleusermessagingplatformsdkios-2.4.0.zip" -o ump.zip
-        unzip -q ump.zip -d ./temp_ump
+        # 3. 🌟 自動搜尋並提取所有 Framework (AdMob, UMP, AppMeasurement)
+        echo "--- 🚚 正在提取實機版 (arm64) Frameworks ---"
+        
+        # 定位所有在 ios-arm64 路徑下的 .framework
+        find ./temp_sdk -path "*/ios-arm64/*.framework" -type d | while read -r f; do
+            name=$(basename "$f")
+            echo "✅ 發現框架: $name"
+            # 複製到 Frameworks 資料夾
+            cp -Rf "$f" ./Frameworks/
+            # 同時建立 include 以便編譯器讀取標頭檔
+            mkdir -p "./include/${name%.framework}"
+            cp -R "$f/Headers"/* "./include/${name%.framework}/" 2>/dev/null || true
+        done
 
-        # 🌟 3. 搬移並重組結構
-        echo "--- 🚚 正在重組 Frameworks ---"
-        
-        # 尋找 AdMob 並搬移 (支援 xcframework 結構)
-        G_FRAMEWORK=$(find ./temp_admob -name "GoogleMobileAds.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
-        if [ -z "$G_FRAMEWORK" ]; then G_FRAMEWORK=$(find ./temp_admob -name "GoogleMobileAds.framework" | head -n 1); fi
-        cp -Rf "$G_FRAMEWORK" ./Frameworks/
-        mkdir -p ./include/GoogleMobileAds
-        cp -R "$G_FRAMEWORK/Headers"/* ./include/GoogleMobileAds/
-        
-        # 尋找 UMP 並搬移
-        U_FRAMEWORK=$(find ./temp_ump -name "UserMessagingPlatform.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
-        if [ -z "$U_FRAMEWORK" ]; then U_FRAMEWORK=$(find ./temp_ump -name "UserMessagingPlatform.framework" | head -n 1); fi
-        cp -Rf "$U_FRAMEWORK" ./Frameworks/
-        mkdir -p ./include/UserMessagingPlatform
-        cp -R "$U_FRAMEWORK/Headers"/* ./include/UserMessagingPlatform/
-        
         echo "--- ✅ 全部結構準備就緒 ---"
         ls -d ./Frameworks/*.framework
 
