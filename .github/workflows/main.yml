@@ -1,0 +1,48 @@
+name: Build AdMob Dylib
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: 📥 下載專案代碼
+      uses: actions/checkout@v4
+
+    - name: ⚙️ 安裝 Theos
+      run: |
+        export THEOS=~/theos
+        bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
+        echo "THEOS=$THEOS" >> $GITHUB_ENV
+
+    - name: 📦 下載 iOS 14.5 SDK (精簡版)
+      run: |
+        mkdir -p $THEOS/sdks
+        curl -L https://github.com/theos/sdks/raw/master/iPhoneOS14.5.sdk.tar.xz -o $THEOS/sdks/iPhoneOS14.5.sdk.tar.xz
+        tar -xf $THEOS/sdks/iPhoneOS14.5.sdk.tar.xz -C $THEOS/sdks/
+        rm $THEOS/sdks/iPhoneOS14.5.sdk.tar.xz
+
+    - name: 🗜️ 解壓縮 Frameworks 並檢查路徑
+      run: |
+        unzip -o Frameworks.zip -d .
+        echo "--- 目前目錄結構 ---"
+        ls -R
+
+    - name: 🚀 開始編譯 Dylib
+      run: |
+        # 這裡會自動處理 Makefile 設定
+        make clean
+        make
+      env:
+        THEOS: ~/theos
+
+    - name: 📤 匯出 Dylib 檔案
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: IPA918_AdMobNative_Dylib
+        path: .theos/obj/debug/arm64/*.dylib
