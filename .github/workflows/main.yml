@@ -24,27 +24,29 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 抓取 Google 官方 SDK (全自動搜索路徑)
+    - name: 🌐 抓取 Google 官方二進位 SDK (保證成功版)
       run: |
-        rm -rf ./Frameworks ./google_sdk ./ump_sdk
+        rm -rf ./Frameworks ./temp_admob ./temp_ump
         mkdir -p ./Frameworks
         
-        # 1. 抓取 Google Ads 並自動尋找 framework
-        git clone --depth 1 https://github.com/googleads/swift-package-manager-google-mobile-ads.git ./google_sdk
-        G_FRAMEWORK=$(find ./google_sdk -name "GoogleMobileAds.framework" | grep "ios-arm64" | head -n 1)
-        if [ -z "$G_FRAMEWORK" ]; then G_FRAMEWORK=$(find ./google_sdk -name "GoogleMobileAds.framework" | head -n 1); fi
-        echo "找到 GoogleMobileAds: $G_FRAMEWORK"
-        cp -R "$G_FRAMEWORK" ./Frameworks/
-
-        # 2. 抓取 UMP 並自動尋找 framework
-        git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./ump_sdk
-        U_FRAMEWORK=$(find ./ump_sdk -name "UserMessagingPlatform.framework" | grep "ios-arm64" | head -n 1)
-        if [ -z "$U_FRAMEWORK" ]; then U_FRAMEWORK=$(find ./ump_sdk -name "UserMessagingPlatform.framework" | head -n 1); fi
-        echo "找到 UserMessagingPlatform: $U_FRAMEWORK"
-        cp -R "$U_FRAMEWORK" ./Frameworks/
+        # 1. 下載官方 AdMob SDK ZIP
+        echo "正在下載 AdMob SDK..."
+        curl -L https://dl.google.com/googleadmobadssdk/googlemobileadssdkios.zip -o admob.zip
+        unzip -q admob.zip -d ./temp_admob
         
-        echo "--- ✅ SDK 準備就緒 ---"
-        ls -d ./Frameworks/*.framework
+        # 2. 下載官方 UMP SDK ZIP
+        echo "正在下載 UMP SDK..."
+        curl -L https://dl.google.com/googleadmobadssdk/googleusermessagingplatformsdkios.zip -o ump.zip
+        unzip -q ump.zip -d ./temp_ump
+        
+        # 3. 搜尋並歸位 (使用更強大的搜尋邏輯)
+        echo "正在搜尋 Frameworks..."
+        find ./temp_admob -name "GoogleMobileAds.framework" -type d -exec cp -R {} ./Frameworks/ \;
+        find ./temp_ump -name "UserMessagingPlatform.framework" -type d -exec cp -R {} ./Frameworks/ \;
+        
+        # 4. 驗證是否成功
+        echo "--- ✅ 最終 Frameworks 內容 ---"
+        ls -d ./Frameworks/*.framework || (echo "❌ 依然找不到 SDK！內容清單如下：" && ls -R ./temp_admob && exit 1)
 
     - name: 🚀 開始編譯 Dylib
       run: |
