@@ -24,32 +24,30 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 自動提取 Google SDK (搜尋模式)
+    - name: 🌐 直接下載官方二進位 SDK (終極修正版)
       run: |
         mkdir -p ./Frameworks
         
-        # 1. 處理 Google Mobile Ads
-        echo "--- 📥 正在抓取 Google Mobile Ads ---"
-        git clone --depth 1 https://github.com/googleads/swift-package-manager-google-mobile-ads.git ./google_sdk
-        # 自動尋找包含 ios-arm64 的 .framework 資料夾
-        G_PATH=$(find ./google_sdk -name "GoogleMobileAds.framework" | grep "ios-arm64" | head -n 1)
-        echo "找到路徑: $G_PATH"
-        cp -R "$G_PATH" ./Frameworks/
+        # 1. 下載並提取 Google Mobile Ads
+        echo "--- 📥 下載 AdMob SDK ---"
+        curl -L https://dl.google.com/googleadmobadssdk/googlemobileadssdkios.zip -o admob.zip
+        unzip -q admob.zip -d ./admob_temp
+        # 暴力搜尋並移動
+        find ./admob_temp -name "GoogleMobileAds.framework" -type d -exec cp -R {} ./Frameworks/ \;
 
-        # 2. 處理 User Messaging Platform (UMP)
-        echo "--- 📥 正在抓取 UMP SDK ---"
-        git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./ump_sdk
-        U_PATH=$(find ./ump_sdk -name "UserMessagingPlatform.framework" | grep "ios-arm64" | head -n 1)
-        echo "找到路徑: $U_PATH"
-        cp -R "$U_PATH" ./Frameworks/
+        # 2. 下載並提取 UMP SDK
+        echo "--- 📥 下載 UMP SDK ---"
+        curl -L https://dl.google.com/googleadmobadssdk/googleusermessagingplatformsdkios.zip -o ump.zip
+        unzip -q ump.zip -d ./ump_temp
+        # 暴力搜尋並移動
+        find ./ump_temp -name "UserMessagingPlatform.framework" -type d -exec cp -R {} ./Frameworks/ \;
 
-        echo "--- ✅ 提取完成，目前的 Frameworks 內容： ---"
-        ls -R ./Frameworks
+        echo "--- ✅ 檢查結果 ---"
+        ls -d ./Frameworks/*.framework
 
     - name: 🚀 開始編譯 Dylib
       run: |
         export THEOS=~/theos
-        # 同時在編譯時強制加入搜尋路徑
         make clean
         make FINALPACKAGE=1
       env:
