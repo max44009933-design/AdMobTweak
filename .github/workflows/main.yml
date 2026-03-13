@@ -24,7 +24,7 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 深度搜索並重組 SDK (排除模擬器版)
+    - name: 🌐 深度搜索並重組 SDK (全 bundle 拷貝版)
       run: |
         # 1. 初始化目錄
         rm -rf ./Frameworks ./include ./temp_admob ./temp_ump
@@ -38,41 +38,34 @@ jobs:
         unzip -q admob.zip -d ./temp_admob
         git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./temp_ump
         
-        # 3. 🌟 精準定位 AdMob (排除 simulator，鎖定 ios-arm64)
-        echo "--- 🔍 正在精準定位 AdMob ---"
-        G_HEADERS=$(find ./temp_admob -name "Headers" -type d | grep "GoogleMobileAds.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
-        if [ -n "$G_HEADERS" ]; then
-          echo "✅ 找到實機版 AdMob Headers: $G_HEADERS"
-          cp -R "$G_HEADERS"/* ./include/GoogleMobileAds/
-          G_BIN=$(dirname "$G_HEADERS")/GoogleMobileAds
-          cp "$G_BIN" ./Frameworks/GoogleMobileAds.framework/GoogleMobileAds || \
-          find ./temp_admob -name "GoogleMobileAds" -type f | grep "ios-arm64" | grep -v "simulator" | xargs -I {} cp {} ./Frameworks/GoogleMobileAds.framework/
+        # 3. 🌟 精準定位 AdMob 並完整拷貝 Bundle
+        echo "--- 🔍 正在定位 AdMob ---"
+        G_FRAMEWORK=$(find ./temp_admob -name "GoogleMobileAds.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
+        if [ -n "$G_FRAMEWORK" ]; then
+          echo "✅ 找到 AdMob: $G_FRAMEWORK"
+          # 完整複製整個 .framework 到 Frameworks 資料夾
+          cp -Rf "$G_FRAMEWORK" ./Frameworks/
+          # 額外複製標頭檔到 include 供 Makefile 的 -I 使用 (確保雙重保險)
+          cp -R "$G_FRAMEWORK/Headers"/* ./include/GoogleMobileAds/
         else
-          echo "❌ 錯誤：找不到 AdMob 實機版標頭檔！"
+          echo "❌ 錯誤：找不到 AdMob 實機版"
           exit 1
         fi
         
-        # 4. 🌟 廣域搜索 UMP (解決 UMP 找不到的問題)
-        echo "--- 🔍 正在廣域搜索 UMP ---"
-        U_HEADERS=$(find ./temp_ump -name "Headers" -type d | grep "UserMessagingPlatform.framework" | grep "ios-arm64" | head -n 1)
-        # 如果還是找不到，嘗試找任何包含 UMP 標頭檔的目錄
-        if [ -z "$U_HEADERS" ]; then
-           U_HEADERS=$(find ./temp_ump -name "UserMessagingPlatform.h" | head -n 1 | xargs dirname)
-        fi
-        
-        if [ -n "$U_HEADERS" ]; then
-          echo "✅ 找到 UMP 標頭檔路徑: $U_HEADERS"
-          cp -R "$U_HEADERS"/* ./include/UserMessagingPlatform/
-          # 搬移二進位檔
-          mkdir -p ./Frameworks/UserMessagingPlatform.framework
-          find ./temp_ump -name "UserMessagingPlatform" -type f | grep "ios-arm64" | head -n 1 | xargs -I {} cp {} ./Frameworks/UserMessagingPlatform.framework/
+        # 4. 🌟 定位 UMP 並完整拷貝 Bundle
+        echo "--- 🔍 正在定位 UMP ---"
+        U_FRAMEWORK=$(find ./temp_ump -name "UserMessagingPlatform.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
+        if [ -n "$U_FRAMEWORK" ]; then
+          echo "✅ 找到 UMP: $U_FRAMEWORK"
+          cp -Rf "$U_FRAMEWORK" ./Frameworks/
+          cp -R "$U_FRAMEWORK/Headers"/* ./include/UserMessagingPlatform/
         else
-          echo "❌ 錯誤：找不到 UMP SDK 檔案！"
-          ls -R ./temp_ump # 失敗時印出結構供診斷
+          echo "❌ 錯誤：找不到 UMP 實機版"
           exit 1
         fi
         
         echo "--- ✅ 全部結構準備就緒 ---"
+        ls -d ./Frameworks/*.framework
 
     - name: 🚀 開始編譯 Dylib
       run: |
