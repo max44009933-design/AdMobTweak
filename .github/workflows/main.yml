@@ -24,32 +24,49 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 📦 使用 CocoaPods 抓取 SDK (業界標準穩定版)
+    - name: 📦 使用 CocoaPods 抓取 SDK (偽裝工程修正版)
       run: |
         mkdir -p ./Frameworks ./include
         
-        # 1. 建立一個臨時 Podfile 來下載 AdMob 和 UMP
+        # 1. 🌟 核心修正：建立一個偽裝的 Xcode 工程目錄，讓 CocoaPods 以為有專案
+        mkdir -p Dummy.xcodeproj
+        
+        # 2. 建立 Podfile 並指定目標
         echo "platform :ios, '14.0'
-        target 'Temp' do
+        target 'Dummy' do
+          use_frameworks!
           pod 'Google-Mobile-Ads-SDK'
         end" > Podfile
         
-        # 2. 執行安裝 (這會自動抓取最新、最完整的 AdMob + UMP)
-        pod install --repo-update
+        # 3. 執行安裝 (增加 --no-integrate 避免它嘗試修改不存在的工程檔)
+        pod install --no-integrate
         
         echo "--- 🔍 正在從 Pods 提取 Frameworks ---"
         
-        # 3. 定位並提取 GoogleMobileAds
-        G_PATH=$(find ./Pods/Google-Mobile-Ads-SDK -name "GoogleMobileAds.framework" -type d | grep "ios-arm64" | grep -v "simulator" | head -n 1)
-        cp -Rf "$G_PATH" ./Frameworks/
-        mkdir -p ./include/GoogleMobileAds
-        cp -R "$G_PATH/Headers"/* ./include/GoogleMobileAds/
+        # 4. 定位並提取 GoogleMobileAds (使用廣域搜尋確保路徑正確)
+        G_PATH=$(find ./Pods -name "GoogleMobileAds.framework" -type d | grep "ios-arm64" | grep -v "simulator" | head -n 1)
+        if [ -n "$G_PATH" ]; then
+            echo "✅ 找到 AdMob: $G_PATH"
+            cp -Rf "$G_PATH" ./Frameworks/
+            mkdir -p ./include/GoogleMobileAds
+            cp -R "$G_PATH/Headers"/* ./include/GoogleMobileAds/
+        else
+            echo "❌ 錯誤：找不到 AdMob Framework！"
+            find ./Pods -name "*.framework"
+            exit 1
+        fi
         
-        # 4. 定位並提取 UserMessagingPlatform
-        U_PATH=$(find ./Pods/GoogleUserMessagingPlatform -name "UserMessagingPlatform.framework" -type d | grep "ios-arm64" | grep -v "simulator" | head -n 1)
-        cp -Rf "$U_PATH" ./Frameworks/
-        mkdir -p ./include/UserMessagingPlatform
-        cp -R "$U_PATH/Headers"/* ./include/UserMessagingPlatform/
+        # 5. 定位並提取 UserMessagingPlatform
+        U_PATH=$(find ./Pods -name "UserMessagingPlatform.framework" -type d | grep "ios-arm64" | grep -v "simulator" | head -n 1)
+        if [ -n "$U_PATH" ]; then
+            echo "✅ 找到 UMP: $U_PATH"
+            cp -Rf "$U_PATH" ./Frameworks/
+            mkdir -p ./include/UserMessagingPlatform
+            cp -R "$U_PATH/Headers"/* ./include/UserMessagingPlatform/
+        else
+            echo "❌ 錯誤：找不到 UMP Framework！"
+            exit 1
+        fi
         
         echo "--- ✅ 全部結構準備就緒 ---"
         ls -d ./Frameworks/*.framework
