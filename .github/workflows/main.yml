@@ -24,26 +24,27 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 📦 使用 CocoaPods 抓取 SDK (偽裝工程修正版)
+    - name: 📦 使用 CocoaPods 抓取 SDK (語法修正版)
       run: |
         mkdir -p ./Frameworks ./include
         
-        # 1. 🌟 核心修正：建立一個偽裝的 Xcode 工程目錄，讓 CocoaPods 以為有專案
+        # 1. 🌟 建立一個更「真」的偽裝 Xcode 工程檔
         mkdir -p Dummy.xcodeproj
+        touch Dummy.xcodeproj/project.pbxproj
         
-        # 2. 建立 Podfile 並指定目標
+        # 2. 建立 Podfile
         echo "platform :ios, '14.0'
         target 'Dummy' do
           use_frameworks!
           pod 'Google-Mobile-Ads-SDK'
         end" > Podfile
         
-        # 3. 執行安裝 (增加 --no-integrate 避免它嘗試修改不存在的工程檔)
-        pod install --no-integrate
+        # 3. 執行安裝 (拔掉 --no-integrate，加入 --repo-update 確保連結最新)
+        pod install --repo-update
         
         echo "--- 🔍 正在從 Pods 提取 Frameworks ---"
         
-        # 4. 定位並提取 GoogleMobileAds (使用廣域搜尋確保路徑正確)
+        # 4. 定位並提取 GoogleMobileAds (廣域搜尋 arm64 實機版)
         G_PATH=$(find ./Pods -name "GoogleMobileAds.framework" -type d | grep "ios-arm64" | grep -v "simulator" | head -n 1)
         if [ -n "$G_PATH" ]; then
             echo "✅ 找到 AdMob: $G_PATH"
