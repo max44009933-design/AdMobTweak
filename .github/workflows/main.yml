@@ -26,24 +26,19 @@ jobs:
 
     - name: 🌐 乾淨提取 SDK (強制驅魔版)
       run: |
-        # 1. 🌟 徹底刪除 Repo 內殘留的舊版本 (這是之前報錯的絕對元凶！)
         rm -rf ./Frameworks ./include ./temp_sdk
         mkdir -p ./Frameworks ./include
         
-        # 2. 📥 下載 Google 官方最新 SDK 整合包
         echo "--- 📥 下載 Google Mobile Ads SDK ---"
         curl -f -L -A "Mozilla/5.0" "https://dl.google.com/googleadmobadssdk/googlemobileadssdkios.zip" -o sdk.zip
         unzip -q sdk.zip -d ./temp_sdk
 
-        # 3. 🚚 自動提取所有實機版 (ios-arm64) Frameworks 並建立 Headers
         echo "--- 🚚 開始提取 Frameworks ---"
         find ./temp_sdk -path "*/ios-arm64/*.framework" -type d | while read -r f; do
             name=$(basename "$f")
             echo "✅ 發現並提取: $name"
-            # 複製整個 Framework 到 Frameworks 資料夾
             cp -Rf "$f" ./Frameworks/
             
-            # 建立對應的 include 目錄並完整複製 Headers (完美保留內部目錄結構)
             folder_name="${name%.framework}"
             mkdir -p "./include/$folder_name"
             if [ -d "$f/Headers" ]; then
@@ -57,6 +52,7 @@ jobs:
     - name: 🚀 開始編譯 Dylib
       run: |
         export THEOS=~/theos
+        touch Dummy.swift # 🌟 神奇魔法：建立一個空的 Swift 檔案解除編譯器限制
         make clean
         make FINALPACKAGE=1
       env:
