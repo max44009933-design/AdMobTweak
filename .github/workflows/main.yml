@@ -1,4 +1,4 @@
-name: Build AdMob Dylib
+name: Build StartApp Dylib
 
 on:
   push:
@@ -13,9 +13,9 @@ jobs:
     - name: 📥 下載專案代碼
       uses: actions/checkout@v4
 
-    - name: ⚙️ 安裝 Theos 與依賴工具 (補上 ldid 簽名工具)
+    - name: ⚙️ 安裝 Theos 與依賴工具
       run: |
-        brew install ldid  # 🌟 關鍵補強：安裝 iOS 簽名工具
+        brew install ldid
         rm -rf ~/theos
         git clone --recursive https://github.com/theos/theos.git ~/theos
         echo "THEOS=~/theos" >> $GITHUB_ENV
@@ -25,30 +25,30 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 乾淨提取 SDK (強制驅魔版)
+    - name: 🌐 提取 Start.io SDK
       run: |
         rm -rf ./Frameworks ./include ./temp_sdk
         mkdir -p ./Frameworks ./include
         
-        echo "--- 📥 下載 Google Mobile Ads SDK ---"
-        curl -f -L -A "Mozilla/5.0" "https://dl.google.com/googleadmobadssdk/googlemobileadssdkios.zip" -o sdk.zip
-        unzip -q sdk.zip -d ./temp_sdk
+        echo "--- 📥 從 GitHub SPM 抓取 StartApp SDK ---"
+        git clone --depth 1 https://github.com/StartApp-SDK/StartAppSDK-SwiftPackage.git ./temp_sdk
 
-        echo "--- 🚚 開始提取 Frameworks ---"
-        find ./temp_sdk -path "*/ios-arm64/*.framework" -type d | while read -r f; do
-            name=$(basename "$f")
-            echo "✅ 發現並提取: $name"
-            cp -Rf "$f" ./Frameworks/
-            
-            folder_name="${name%.framework}"
-            mkdir -p "./include/$folder_name"
-            if [ -d "$f/Headers" ]; then
-                cp -R "$f/Headers"/* "./include/$folder_name/" 2>/dev/null || true
-            fi
-        done
+        echo "--- 🚚 提取 ios-arm64 Framework ---"
+        # 尋找實機版 arm64 的 StartApp.framework
+        FW_PATH=$(find ./temp_sdk -path "*/ios-arm64/StartApp.framework" -o -path "*/ios-arm64_armv7/StartApp.framework" | head -n 1)
+        
+        if [ -n "$FW_PATH" ]; then
+            cp -Rf "$FW_PATH" ./Frameworks/
+            mkdir -p ./include/StartApp
+            cp -R "$FW_PATH/Headers"/* ./include/StartApp/ 2>/dev/null || true
+            echo "✅ 成功提取 StartApp.framework"
+        else
+            echo "❌ 找不到 StartApp.framework"
+            exit 1
+        fi
 
         echo "--- ✅ 結構檢查 ---"
-        ls -F ./include/GoogleMobileAds/ | head -n 10
+        ls -F ./include/StartApp/ | head -n 10
 
     - name: 🚀 開始編譯 Dylib
       run: |
@@ -63,5 +63,5 @@ jobs:
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: IPA918_AdMobNative_Dylib
+        name: IPA918_StartAppNative_Dylib
         path: .theos/obj/arm64/*.dylib
