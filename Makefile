@@ -1,14 +1,15 @@
 export ARCHS = arm64
 export TARGET = iphone:clang:latest:14.0
 
-TWEAK_NAME = IPA918_AdMobNative
-IPA918_AdMobNative_FILES = Tweak.x Dummy.swift
+# 名字我幫你改成 StartApp 專屬了
+TWEAK_NAME = IPA918_StartAppNative
+IPA918_StartAppNative_FILES = Tweak.x Dummy.swift
 
-IPA918_AdMobNative_CFLAGS = -fobjc-arc -I$(THEOS_PROJECT_DIR)/include
-IPA918_AdMobNative_LDFLAGS = -F$(THEOS_PROJECT_DIR)/Frameworks -lc++ -rpath /usr/lib/swift
+IPA918_StartAppNative_CFLAGS = -fobjc-arc -I$(THEOS_PROJECT_DIR)/include
+IPA918_StartAppNative_LDFLAGS = -F$(THEOS_PROJECT_DIR)/Frameworks -lc++ -rpath /usr/lib/swift
 
-# 🌟 關鍵補強：除了 AdMob，還要加入它所依賴的 Apple 官方底層框架
-IPA918_AdMobNative_FRAMEWORKS = UIKit Foundation GoogleMobileAds UserMessagingPlatform JavaScriptCore WebKit AVFoundation StoreKit SystemConfiguration AdSupport
+# 🌟 載入 StartApp 與蘋果系統底層庫
+IPA918_StartAppNative_FRAMEWORKS = UIKit Foundation StartApp AVFoundation CoreMedia StoreKit SystemConfiguration AdSupport WebKit CoreGraphics CoreTelephony
 
 include $(THEOS)/makefiles/common.mk
 include $(THEOS_MAKE_PATH)/tweak.mk
