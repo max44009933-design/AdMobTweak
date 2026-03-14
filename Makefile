@@ -4,11 +4,10 @@ export TARGET = iphone:clang:latest:14.0
 TWEAK_NAME = IPA918_AdMobNative
 IPA918_AdMobNative_FILES = Tweak.x
 
-# 🌟 關鍵修正：-I 指向 include (標頭檔)，-F 指向 Frameworks (庫檔案)
-IPA918_AdMobNative_CFLAGS = -fobjc-arc -I$(PWD)/include
-IPA918_AdMobNative_LDFLAGS = -F$(PWD)/Frameworks
+IPA918_AdMobNative_CFLAGS = -fobjc-arc -I$(THEOS_PROJECT_DIR)/include
+IPA918_AdMobNative_LDFLAGS = -F$(THEOS_PROJECT_DIR)/Frameworks
 
-# 指定要連結的框架
+# 🌟 關鍵修改：移除了 GoogleAppMeasurement
 IPA918_AdMobNative_FRAMEWORKS = UIKit Foundation GoogleMobileAds UserMessagingPlatform
 
 include $(THEOS)/makefiles/common.mk
