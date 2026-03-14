@@ -13,8 +13,9 @@ jobs:
     - name: 📥 下載專案代碼
       uses: actions/checkout@v4
 
-    - name: ⚙️ 安裝 Theos
+    - name: ⚙️ 安裝 Theos 與依賴工具 (補上 ldid 簽名工具)
       run: |
+        brew install ldid  # 🌟 關鍵補強：安裝 iOS 簽名工具
         rm -rf ~/theos
         git clone --recursive https://github.com/theos/theos.git ~/theos
         echo "THEOS=~/theos" >> $GITHUB_ENV
@@ -52,7 +53,7 @@ jobs:
     - name: 🚀 開始編譯 Dylib
       run: |
         export THEOS=~/theos
-        touch Dummy.swift # 🌟 神奇魔法：建立一個空的 Swift 檔案解除編譯器限制
+        touch Dummy.swift
         make clean
         make FINALPACKAGE=1
       env:
