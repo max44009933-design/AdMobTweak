@@ -24,43 +24,46 @@ jobs:
         rm -rf ~/theos/sdks
         git clone --depth 1 https://github.com/theos/sdks.git ~/theos/sdks
 
-    - name: 🌐 提取 SDK (完美結構對位版)
+    - name: 🌐 乾淨提取 SDK (SPM 倉庫純淨版)
       run: |
-        mkdir -p ./Frameworks ./include ./temp_sdk
+        mkdir -p ./Frameworks ./include
         
-        # 1. 下載最新 SDK
-        echo "--- 📥 下載 Google Mobile Ads SDK ---"
-        curl -f -L -A "Mozilla/5.0" "https://dl.google.com/googleadmobadssdk/googlemobileadssdkios.zip" -o sdk.zip
-        unzip -q sdk.zip -d ./temp_sdk
+        # 1. 抓取 AdMob SPM 倉庫 (確保是最新版)
+        echo "--- 📥 抓取 Google Mobile Ads SPM ---"
+        git clone --depth 1 https://github.com/googleads/swift-package-manager-google-mobile-ads.git ./admob_spm
+        
+        # 2. 抓取 UMP SPM 倉庫
+        echo "--- 📥 抓取 UMP SPM ---"
+        git clone --depth 1 https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git ./ump_spm
 
-        # 2. 🌟 提取 GoogleMobileAds (完美保留結構)
-        echo "--- 🚚 提取 GoogleMobileAds ---"
-        G_PATH=$(find ./temp_sdk -name "GoogleMobileAds.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
-        if [ -n "$G_PATH" ]; then
-          cp -Rf "$G_PATH" ./Frameworks/
+        # 3. 🌟 精準提取 Frameworks 和 Headers
+        echo "--- 🚚 重組結構 ---"
+        
+        # 處理 AdMob
+        G_FW=$(find ./admob_spm -name "GoogleMobileAds.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
+        if [ -n "$G_FW" ]; then
+          cp -Rf "$G_FW" ./Frameworks/
           mkdir -p ./include/GoogleMobileAds
-          # 使用 -R 遞迴複製，完美保留包含 Mediation 在內的所有子目錄結構
-          cp -R "$G_PATH/Headers"/* ./include/GoogleMobileAds/
+          # 強制複製 Headers，保留子目錄結構
+          cp -R "$G_FW/Headers"/* ./include/GoogleMobileAds/
         fi
 
-        # 3. 🌟 提取 UserMessagingPlatform (UMP)
-        echo "--- 🚚 提取 UMP ---"
-        U_PATH=$(find ./temp_sdk -name "UserMessagingPlatform.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
-        if [ -n "$U_PATH" ]; then
-          cp -Rf "$U_PATH" ./Frameworks/
+        # 處理 UMP
+        U_FW=$(find ./ump_spm -name "UserMessagingPlatform.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
+        if [ -n "$U_FW" ]; then
+          cp -Rf "$U_FW" ./Frameworks/
           mkdir -p ./include/UserMessagingPlatform
-          cp -R "$U_PATH/Headers"/* ./include/UserMessagingPlatform/
+          cp -R "$U_FW/Headers"/* ./include/UserMessagingPlatform/
         fi
-
-        # 4. 🌟 提取 GoogleAppMeasurement
-        echo "--- 🚚 提取 AppMeasurement ---"
-        M_PATH=$(find ./temp_sdk -name "GoogleAppMeasurement.framework" | grep "ios-arm64" | head -n 1)
-        if [ -n "$M_PATH" ]; then
-          cp -Rf "$M_PATH" ./Frameworks/
+        
+        # 處理 AppMeasurement (可能包在 AdMob 裡)
+        M_FW=$(find ./admob_spm -name "GoogleAppMeasurement.framework" | grep "ios-arm64" | grep -v "simulator" | head -n 1)
+        if [ -n "$M_FW" ]; then
+          cp -Rf "$M_FW" ./Frameworks/
         fi
 
         echo "--- ✅ 結構檢查 ---"
-        ls -F ./include/GoogleMobileAds/
+        ls -F ./include/GoogleMobileAds/ | head -n 10
 
     - name: 🚀 開始編譯 Dylib
       run: |
