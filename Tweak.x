@@ -24,7 +24,7 @@
 
     // 🌟 1. 初始化 StartApp SDK
     STAStartAppSDK *sdk = [STAStartAppSDK sharedInstance];
-    sdk.appID = @"你的_STARTAPP_ID"; // <--- ⚠️ 把這行換成你在後台拿到的數字 ID ⚠️
+    sdk.appID = @"202639835"; // <--- ⚠️ 把這行換成你在後台拿到的數字 ID ⚠️
     
     // 🌟 2. 建立廣告物件並開始載入
     self.rewardedVideoAd = [[STAStartAppAd alloc] init];
